@@ -1,0 +1,22 @@
+{
+	"name": "crazedsanity/version",
+	"license": "MIT",
+	"description": "Version parsing class, derived from cs-content, mostly SemVer compliant",
+	"keywords": ["php", "dry", "oaoo"],
+	"homepage": "http://www.crazedsanity.com",
+	"license": "MIT",
+	"authors": [
+		{
+			"name": "Dan Falconer",
+			"email": "github@crazedsanity.com",
+			"homepage": "http://www.crazedsanity.com",
+			"role": "Developer"
+		}
+	],
+	"autoload": {
+		"classmap":	["src/"]
+	},
+	"require": {
+		"php":	">=5.3.0"
+	}
+}

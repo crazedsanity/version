@@ -11,15 +11,6 @@ use crazedsanity\version\Version;
 class testOfCSVersionAbstract extends PHPUnit_Framework_TestCase {
 	
 	//--------------------------------------------------------------------------
-	public function test_backwardCompabibility() {
-		//Just make sure we can actually 
-		$x = new _testBackCompat_1_2_6_or_less();
-		$this->assertTrue(is_object($x));
-	}
-	//--------------------------------------------------------------------------
-	
-	
-	//--------------------------------------------------------------------------
 	function test_version_basics() {
 		
 		$tests = array(
@@ -87,7 +78,7 @@ class testOfCSVersionAbstract extends PHPUnit_Framework_TestCase {
 		);
 		
 		foreach($tests as $name=>$checkData) {
-			$ver = new cs_version;
+			$ver = new Version;
 			$this->assertTrue($ver->is_higher_version($checkData[1], $checkData[0]));
 			$this->assertFalse($ver->is_higher_version($checkData[0], $checkData[1]));
 			
@@ -106,19 +97,12 @@ class testOfCSVersionAbstract extends PHPUnit_Framework_TestCase {
 			'extra spaces'			=> array(' 1.0   ', '1.0.0', '')
 		);
 		foreach($tests2 as $name=>$checkData) {
-			$ver = new cs_version;
-			$bc = new _testBackCompat_1_2_6_or_less();
+			$ver = new Version;
 			
 			//rip apart & recreate first version to test against the expected...
 			{
 				$this->assertEquals(
 						$ver->build_full_version_string($ver->parse_version_string($checkData[0])),
-						$checkData[1]
-					);
-
-				//test backward compabitibility (for the above test)
-				$this->assertEquals(
-						$bc->build_full_version_string($bc->parse_version_string($checkData[0])), 
 						$checkData[1]
 					);
 			}
@@ -127,11 +111,6 @@ class testOfCSVersionAbstract extends PHPUnit_Framework_TestCase {
 			{
 				$this->assertEquals(
 						$ver->build_full_version_string($ver->parse_version_string($checkData[1])), 
-						$checkData[1]
-					);
-
-				//test backward compabitibility (for the above test)
-				$this->assertEquals($bc->build_full_version_string($bc->parse_version_string($checkData[1])), 
 						$checkData[1]
 					);
 			}
@@ -167,7 +146,7 @@ class testOfCSVersionAbstract extends PHPUnit_Framework_TestCase {
 //	 * @expectedException LengthException
 //	 */
 //	public function test_exceptionProjectMissing() {
-//		$ver = new cs_version();
+//		$ver = new version();
 //		$projectInfo = $ver->set_version_file_location(dirname(__FILE__) .'/files/version4');
 //		
 //		$ver->gfObj->debug_print($projectInfo,1);

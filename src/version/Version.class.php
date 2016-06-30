@@ -334,7 +334,7 @@ class Version {
 	
 	
 	//=========================================================================
-	protected function parse_suffix($suffix) {
+	public static function parse_suffix($suffix) {
 		$retval = NULL;
 		if(strlen($suffix)) {
 			//determine what kind it is.

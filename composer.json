@@ -4,7 +4,6 @@
 	"description": "Version parsing class, derived from cs-content, mostly SemVer compliant",
 	"keywords": ["php", "dry", "oaoo"],
 	"homepage": "http://www.crazedsanity.com",
-	"license": "MIT",
 	"authors": [
 		{
 			"name": "Dan Falconer",

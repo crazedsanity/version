@@ -9,26 +9,42 @@ namespace crazedsanity\version;
 
 class Version {
 	
-	public $isTest = FALSE;
-	
-	
-	
 	protected $versionFileLocation=null;
-	private $fullVersionString;
-	private $suffixList = array(
+	private $_fullVersionString = null;
+	private $_projectName = "unknown";
+	public static $suffixList = array(
 		'ALPHA', 	//very unstable
 		'BETA', 	//kinda unstable, but probably useable
 		'RC'		//all known bugs fixed, searching for unknown ones
 	);
 	
+	protected $_versionData = array();
 	
 	
-	#abstract public function __construct();
+	
 	//=========================================================================
-	function __construct($makeGfObj=true) {
-		$this->set_version_file_location(dirname(__FILE__) . '/../../VERSION');
-		$this->get_version();
-		$this->get_project();
+	function __construct($versionData, $projectName=null) {
+		if(is_array($versionData)) {
+			$this->_versionData = $versionData;
+		}
+		elseif(is_string($versionData)) {
+			if(file_exists($versionData)) {
+//				$this->set_version_file_location($versionData);
+				$this->_versionData = $this->parse_version_file($versionData, true);
+			}
+			else {
+				$this->_versionData = $this->parse_version_string($versionData);
+			}
+		}
+		else {
+			throw new \InvalidArgumentException("no version data supplied");
+		}
+		
+		if(!is_null($projectName) && !empty($projectName)) {
+			$this->_projectName = $projectName;
+		}
+		
+		$this->_fullVersionString = self::build_full_version_string($this->_versionData);
 	}//end __construct()
 	//=========================================================================
 	
@@ -38,66 +54,75 @@ class Version {
 	/**
 	 * Retrieve our version string from the VERSION file.
 	 */
-	final public function get_version($asArray=false) {
-		$retval = NULL;
+	public function get_version($asArray=false) {
+//		trigger_error("Deprecated function called (". __METHOD__ .")", E_USER_NOTICE);
+//		return self::parse_version_file($this->versionFileLocation, $asArray);
 		
-		$this->auto_set_version_file();
-		
-		if(file_exists($this->versionFileLocation)) {
-			$myMatches = array();
-			$findIt = preg_match('/VERSION: (.+)/', file_get_contents($this->versionFileLocation), $matches);
-			
-			if($findIt == 1 && count($matches) == 2) {
-				$fullVersionString = $matches[1];
-				$versionInfo = $this->parse_version_string($fullVersionString);
-				$this->fullVersionString = $this->build_full_version_string($versionInfo);
-				
-				
-				if($asArray) {
-					$retval = $versionInfo;
-					$retval['version_string'] = $this->fullVersionString;
-				}
-				else {
-					$retval = $this->build_full_version_string($versionInfo);
-				}
-			}
-			else {
-				throw new \Exception(__METHOD__ .": failed to retrieve version string in file " .
-						"(". $this->versionFileLocation .")");
-			}
+		if($asArray) {
+			$retval = $this->_versionData;
+			$retval['version_string'] = self::build_full_version_string($this->_versionData);
 		}
 		else {
-			throw new \Exception(__METHOD__ .": failed to retrieve version information, file " .
-					"(". $this->versionFileLocation .") does not exist or was not set");
+//			$retval = self::build_full_version_string($this->_versionData);
+			$retval = $this->_fullVersionString;
 		}
 		
-		return($retval);
+		return $retval;
 	}//end get_version()
 	//=========================================================================
 	
 	
 	
 	//=========================================================================
-	final public function get_project() {
-		$retval = NULL;
-		//$this->auto_set_version_file();
-		if(file_exists($this->versionFileLocation)) {
-			$matches = array();
-			$findIt = preg_match('/PROJECT: (.+)/', file_get_contents($this->versionFileLocation), $matches);
+	public function parse_version_file($pathToFile, $asArray=false) {
+		$foundIt = 0;
+		if(file_exists($pathToFile)) {
 			
-			if($findIt == 1 && count($matches) == 2 && strlen($matches[1])) {
-				$retval = $matches[1];
+			$lines = explode("\n", file_get_contents($pathToFile));
+			
+			foreach($lines as $lineData) {
+				if(strlen($lineData) && preg_match('/(^[A-Z]{3,}):(.+)/', $lineData)) {
+					$theBits = explode(': ', $lineData, 2);
+					
+					
+					switch(strtolower($theBits[0])) {
+						case 'project':
+							$this->_projectName = trim($theBits[1]);
+							break;
+						case 'version':
+							$versionInfo = self::parse_version_string($theBits[1]);
+							$fullVersionString = self::build_full_version_string($versionInfo);
+							
+							if($asArray) {
+								$retval = $versionInfo;
+								$retval['version_string'] = $fullVersionString;
+							}
+							else {
+								$retval = $fullVersionString;
+							}
+							$foundIt++;
+							break;
+					}
+				}
 			}
-			else {
-				throw new \LengthException(__METHOD__ .": failed to retrieve project string");
+			
+			if($foundIt !== 1) {
+				throw new \Exception("no version found");
 			}
 		}
 		else {
-			//this shouldn't happen, because other things shouldn't mess with versionFileLocation
-			throw new \LogicException(__METHOD__ .": failed to retrieve project information");
+			throw new \Exception(__METHOD__ .": failed to retrieve version information, file ({$pathToFile}) does not exist");
 		}
 		
-		return($retval);
+		return $retval;
+	}
+	//=========================================================================
+	
+	
+	
+	//=========================================================================
+	final public function get_project() {
+		return $this->_projectName;
 	}//end get_project()
 	//=========================================================================
 	
@@ -117,59 +142,11 @@ class Version {
 	
 	
 	//=========================================================================
-	/** 
-	 * // Testing this is difficult... so it is ignored.
-	 */
-	public function auto_set_version_file() {
-		//@codeCoverageIgnoreStart
-		if(!strlen($this->versionFileLocation)) {
-			$bt = debug_backtrace();
-			foreach($bt as $callNum=>$data) {
-				if(strlen($data['class'])) {
-					if($data['class'] != __CLASS__) {
-						$dir = dirname($data['file']);
-						if(preg_match('/tests$/', $dir)) {
-							$dir = preg_replace('/\/tests$/', '', $dir);
-						}
-						elseif(preg_match('/test$/', $dir)) {
-							$dir = preg_replace('/\/test$/', '', $dir);
-						}
-						break;
-					}
-				}
-				else {
-					throw new \LogicException(__METHOD__ .": failed to locate the calling class in backtrace");
-				}
-			}
-			
-			if(file_exists($dir .'/VERSION')) {
-				$this->set_version_file_location($dir .'/VERSION');
-			}
-			elseif(file_exists($dir .'/../VERSION')) {
-				$this->set_version_file_location($dir .'/../VERSION');
-			}
-			elseif(file_exists($dir .'/../../VERSION')) {
-				$this->set_version_file_location($dir .'/../../VERSION');
-			}
-			else {
-				if(function_exists('cs_debug_backtrace')) {
-					cs_debug_backtrace(1);
-				}
-				throw new \LogicException(__METHOD__ .": failed to automatically set version file (tried ". $dir ."/VERSION)");
-			}
-		}
-		//@codeCoverageIgnoreEnd
-	}//end auto_set_version_file()
-	//=========================================================================
-	
-	
-	
-	//=========================================================================
 	/**
 	 * 
 	 * TODO: add logic to split apart the suffix (i.e. "-ALPHA5" broken into "ALPHA" and "5").
 	 */
-	public function parse_version_string($version) {
+	public static function parse_version_string($version) {
 		if(is_string($version) && strlen($version) && preg_match('/\./', $version)) {
 			$version = preg_replace('/ /', '', $version);
 			
@@ -201,7 +178,7 @@ class Version {
 			$retval['version_suffix'] = $suffix;
 		}
 		else {
-			throw new \Exception(__METHOD__ .": invalid version string passed (". $version .")");
+			throw new \InvalidArgumentException(__METHOD__ .": invalid version string passed (". $version .")");
 		}
 		
 		return($retval);
@@ -211,49 +188,32 @@ class Version {
 	
 	
 	//=========================================================================
-	public function build_full_version_string(array $versionInfo) {
-		$requiredIndexes = array(
-			'version_major', 'version_minor', 'version_maintenance', 'version_suffix'
-		);
+	public static function build_full_version_string(array $versionInfo) {
 		
-		$missing="";
-		$count=0;
-		foreach($requiredIndexes as $indexName) {
-			if(isset($versionInfo[$indexName])) {
-				$count++;
-			}
-			else {
-				if(strlen($missing)) {
-					$missing .= ", ". $indexName;
-				}
-				else {
-					$missing = $indexName;
-				}
-			}
+		$myVersionString = '0';
+		if(isset($versionInfo['version_major'])) {
+			$myVersionString = $versionInfo['version_major'];
 		}
 		
-		if($count == count($requiredIndexes) && !strlen($missing)) {
-			$suffix = $versionInfo['version_suffix'];
-			unset($versionInfo['version_suffix']);
-			
-			$retval = "";
-			foreach($versionInfo as $name=>$value) {
-				if(strlen($retval)) {
-					$retval .= ".". $value;
-				}
-				else {
-					$retval = $value;
-				}
-			}
-			if(strlen($suffix)) {
-				$retval .= "-". $suffix;
-			}
+		if(isset($versionInfo['version_minor'])) {
+			$myVersionString .= '.'. $versionInfo['version_minor'];
 		}
 		else {
-			throw new \Exception(__METHOD__ .": missing indexes in given array (". $missing .")");
+			$myVersionString .= '.0';
 		}
 		
-		return($retval);
+		if(isset($versionInfo['version_maintenance'])) {
+			$myVersionString .= '.'. $versionInfo['version_maintenance'];
+		}
+		else {
+			$myVersionString .= '.0';
+		}
+		
+		if(isset($versionInfo['version_suffix']) && !empty($versionInfo['version_suffix'])) {
+			$myVersionString .= '-'. $versionInfo['version_suffix'];
+		}
+		
+		return $myVersionString;
 		
 	}//end build_full_version_string()
 	//=========================================================================
@@ -261,17 +221,17 @@ class Version {
 	
 	
 	//=========================================================================
-	public function is_higher_version($version, $checkIfHigher) {
+	public static function is_higher_version($version, $checkIfHigher) {
 		$retval = FALSE;
 		if(!is_string($version) || !is_string($checkIfHigher)) {
-			throw new \Exception(__METHOD__ .": no valid version strings, version=(". $version ."), checkIfHigher=(". $checkIfHigher .")");
+			throw new \InvalidArgumentException(__METHOD__ .": no valid version strings, version=(". $version ."), checkIfHigher=(". $checkIfHigher .")");
 		}
 		elseif($version == $checkIfHigher) {
 			$retval = FALSE;
 		}
 		else {
-			$curVersionArr = $this->parse_version_string($version);
-			$checkVersionArr = $this->parse_version_string($checkIfHigher);
+			$curVersionArr = self::parse_version_string($version);
+			$checkVersionArr = self::parse_version_string($checkIfHigher);
 			
 			unset($curVersionArr['version_string'], $checkVersionArr['version_string']);
 			
@@ -322,8 +282,8 @@ class Version {
 					//we know the suffixes are there and DO match.
 					if(strlen($curVersionSuffix) && strlen($checkVersionSuffix)) {
 						//okay, here's where we do some crazy things...
-						$curVersionData = $this->parse_suffix($curVersionSuffix);
-						$checkVersionData = $this->parse_suffix($checkVersionSuffix);
+						$curVersionData = self::parse_suffix($curVersionSuffix);
+						$checkVersionData = self::parse_suffix($checkVersionSuffix);
 						
 						if($curVersionData['type'] == $checkVersionData['type']) {
 							//got the same suffix type (like "BETA"), check the number.
@@ -342,7 +302,7 @@ class Version {
 						}
 						else {
 							//not the same suffix... see if the new one is higher.
-							$suffixValues = array_flip($this->suffixList);
+							$suffixValues = array_flip(self::$suffixList);
 							if($suffixValues[$checkVersionData['type']] > $suffixValues[$curVersionData['type']]) {
 								$retval = TRUE;
 							}
@@ -378,7 +338,7 @@ class Version {
 		$retval = NULL;
 		if(strlen($suffix)) {
 			//determine what kind it is.
-			foreach($this->suffixList as $type) {
+			foreach(self::$suffixList as $type) {
 				if(preg_match('/^'. $type .'/', $suffix)) {
 					$checkThis = preg_replace('/^'. $type .'/', '', $suffix);
 					if(strlen($checkThis) && is_numeric($checkThis)) {
@@ -401,6 +361,14 @@ class Version {
 		
 		return($retval);
 	}//end parse_suffix()
+	//=========================================================================
+	
+	
+	
+	//=========================================================================
+	public function __get($name) {
+		trigger_error("Deprecated method called (". $name .")", E_USER_DEPRECATED);
+	}
 	//=========================================================================
 	
 	
